@@ -14,9 +14,21 @@ import androidx.fragment.app.Fragment
 import com.google.android.gms.maps.*
 import com.google.android.gms.maps.model.*
 import com.supinternet.aqi.R
+import com.supinternet.aqi.data.network.AQIAPI
+import com.supinternet.aqi.data.network.model.ranking.Station
+import com.supinternet.aqi.ui.utils.GoogleMapUtils
 import kotlinx.android.synthetic.main.fragment_maps.*
 import kotlinx.android.synthetic.main.fragment_maps_search_card.*
 import kotlinx.android.synthetic.main.fragment_maps_station_card.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class MapsTab : Fragment(), OnMapReadyCallback {
 
@@ -50,8 +62,13 @@ class MapsTab : Fragment(), OnMapReadyCallback {
 
             // La valeur saisie par l'utilisateur
             val search = maps_tab_search_field.text.toString()
+            GlobalScope.launch {
+                val stations = AQIAPI.getInstance().listStationsAround(search).await()
+                withContext(Dispatchers.Main){
+                    addMarkers(stations.stations)
+                }
+            }
 
-            // TODO 2) Appeler la requête pour la recherche textuelle
         }
 
         // Dans le champ de recherche, écoute du bouton Enter pour lancer la recherche
@@ -69,7 +86,15 @@ class MapsTab : Fragment(), OnMapReadyCallback {
         // Clic sur le bouton Rechercher
         maps_tab_search_zone_button.setOnClickListener {
             // TODO 3) Récupérer la zone de la carte actuellement affichée
+            val coordonates = map.projection.visibleRegion.latLngBounds.northeast.latitude.toString() +","+map.projection.visibleRegion.latLngBounds.northeast.longitude.toString()+","+map.projection.visibleRegion.latLngBounds.southwest.latitude.toString()+","+map.projection.visibleRegion.latLngBounds.southwest.longitude.toString()
 
+            GlobalScope.launch {
+                val stations = AQIAPI.getInstance().listStationsLocalisation(coordonates).await()
+
+                withContext(Dispatchers.Main){
+                    addMarkers(stations.stations)
+                }
+            }
             map.projection.visibleRegion.latLngBounds.northeast
         }
     }
@@ -81,7 +106,7 @@ class MapsTab : Fragment(), OnMapReadyCallback {
 
     // Center camera = recentre la caméra sur la liste des markers
     // (à utiliser pour la recherche textuelle uniquement)
-    private fun addMarkers(markers: List<Any>, centerCamera: Boolean = false) {
+    private fun addMarkers(markers: List<Station>, centerCamera: Boolean = false) {
         map.clear()
 
         // Limiter à 20 marqueurs
@@ -101,21 +126,21 @@ class MapsTab : Fragment(), OnMapReadyCallback {
             val builder = LatLngBounds.Builder()
 
             for (data in stations) {
-//                val marker = MarkerOptions().position(
-//                    LatLng(
-//                        data.lat,
-//                        data.lon
-//                    )
-//                ).icon(
-//                    BitmapDescriptorFactory.fromBitmap(
-//                        GoogleMapUtils.getBitmap(
-//                            requireContext(),
-//                            R.drawable.ic_map_marker
-//                        )
-//                    )
-//                )
-//
-//                this.markers[map.addMarker(marker)] = data
+                val marker = MarkerOptions().position(
+                    LatLng(
+                        data.latitude,
+                        data.longitude
+                    )
+                ).icon(
+                    BitmapDescriptorFactory.fromBitmap(
+                        GoogleMapUtils.getBitmap(
+                            requireContext(),
+                            R.drawable.ic_map_marker
+                        )
+                    )
+                )
+
+                this.markers[map.addMarker(marker)] = data
             }
 
             if (centerCamera) {
@@ -190,9 +215,11 @@ class MapsTab : Fragment(), OnMapReadyCallback {
         // TODO 6) Lors du clic sur un marqueur
         googleMap.setOnMarkerClickListener { marker ->
             val data = markers[marker]
-
             // TODO Appeler showDetailsMarker
-
+            val df = SimpleDateFormat("yyyy.MM.dd HH:mm")
+            val timestamp =  df.parse(data.date).time
+            showDetailsCard(data.title,data.date,data.aqi)
+            // showDetailsCard("toto",System.currentTimeMillis(),10)
             true
         }
     }
