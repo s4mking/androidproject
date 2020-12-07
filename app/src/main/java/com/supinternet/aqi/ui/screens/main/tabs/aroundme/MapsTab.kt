@@ -214,11 +214,11 @@ class MapsTab : Fragment(), OnMapReadyCallback {
 
         // TODO 6) Lors du clic sur un marqueur
         googleMap.setOnMarkerClickListener { marker ->
-            val data = markers[marker]
+            val data = markers[marker] as Station
             // TODO Appeler showDetailsMarker
-            val df = SimpleDateFormat("yyyy.MM.dd HH:mm")
+            val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
             val timestamp =  df.parse(data.date).time
-            showDetailsCard(data.title,data.date,data.aqi)
+            showDetailsCard(data.address,timestamp,data.aqi)
             // showDetailsCard("toto",System.currentTimeMillis(),10)
             true
         }
